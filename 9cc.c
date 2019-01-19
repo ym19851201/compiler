@@ -35,12 +35,17 @@ Node *mul();
 Node *term();
 Vector *new_vector();
 void vec_push(Vector *vec, void *elem);
+void *vec_get(Vector *vec, int i);
+Token *vec_get_token(Vector *vec, int i);
 void error(char* msg, char* input);
 int expect(int line, int expected, int actual);
 
-Token tokens[100];
+/*Token tokens[100];*/
+Vector *tokens;
 
-void tokenize(char *p) {
+void tokenize2(char *p) {
+  tokens = new_vector();
+
   int i = 0;
   while (*p) {
     if (isspace(*p)) {
@@ -49,16 +54,20 @@ void tokenize(char *p) {
     }
 
     if (*p == '+' || *p =='-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
-      tokens[i].ty = *p;
+      Token *t = malloc(sizeof(Token));
+      t->ty = *p;
+      vec_push(tokens, (void *)t);
       i++;
       p++;
       continue;
     }
 
     if (isdigit(*p)) {
-      tokens[i].ty = TK_NUM;
-      tokens[i].input = p;
-      tokens[i].val = strtol(p, &p, 10);
+      Token *t = malloc(sizeof(Token));
+      t->ty = TK_NUM;
+      t->input = p;
+      t->val = strtol(p, &p, 10);
+      vec_push(tokens, (void *)t);
       i++;
       continue;
     }
@@ -66,9 +75,43 @@ void tokenize(char *p) {
     fprintf(stderr, "Could not tokenize: %s\n", p);
     exit(1);
   }
-  tokens[i].ty = TK_EOF;
-  tokens[i].input = p;
+  Token *t = malloc(sizeof(Token));
+  t->ty = TK_EOF;
+  t->input = p;
+  vec_push(tokens, (void *)t);
+/*  tokens[i].ty = TK_EOF;*/
+/*  tokens[i].input = p;*/
 }
+
+/*void tokenize(char *p) {*/
+/*  int i = 0;*/
+/*  while (*p) {*/
+/*    if (isspace(*p)) {*/
+/*      p++;*/
+/*      continue;*/
+/*    }*/
+
+/*    if (*p == '+' || *p =='-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {*/
+/*      tokens[i].ty = *p;*/
+/*      i++;*/
+/*      p++;*/
+/*      continue;*/
+/*    }*/
+
+/*    if (isdigit(*p)) {*/
+/*      tokens[i].ty = TK_NUM;*/
+/*      tokens[i].input = p;*/
+/*      tokens[i].val = strtol(p, &p, 10);*/
+/*      i++;*/
+/*      continue;*/
+/*    }*/
+
+/*    fprintf(stderr, "Could not tokenize: %s\n", p);*/
+/*    exit(1);*/
+/*  }*/
+/*  tokens[i].ty = TK_EOF;*/
+/*  tokens[i].input = p;*/
+/*}*/
 
 Node *new_node(int ty, Node *lhs, Node *rhs) {
   Node *node = malloc(sizeof(Node));
@@ -86,7 +129,8 @@ Node *new_node_num(int val) {
 }
 
 int consume(int ty) {
-  if (tokens[pos].ty != ty)
+/*  if (vec_get(tokens, pos)->ty != ty)*/
+  if (vec_get_token(tokens, pos)->ty != ty)
     return 0;
   pos++;
   return 1;
@@ -96,14 +140,14 @@ Node *term() {
   if (consume('(')) {
     Node *node = add();
     if (!consume(')'))
-      error("tojiro: %s", tokens[pos].input);
+      error("tojiro: %s", vec_get_token(tokens, pos)->input);
     return node;
   }
 
-  if (tokens[pos].ty == TK_NUM)
-    return new_node_num(tokens[pos++].val);
+  if (vec_get_token(tokens, pos)->ty == TK_NUM)
+    return new_node_num(vec_get_token(tokens, pos++)->val);
 
-  error("dame: %s", tokens[pos].input);
+  error("dame: %s", vec_get_token(tokens, pos)->input);
 }
 
 Node *mul() {
@@ -186,6 +230,17 @@ void vec_push(Vector *vec, void *elem) {
   vec->data[vec->len++] = elem;
 }
 
+void *vec_get(Vector *vec, int i) {
+/*  if (i > vec->len - 1) {*/
+/*    fprintf(stderr, "NOOOO\n");*/
+/*  }*/
+  return vec->data[i];
+}
+
+Token *vec_get_token(Vector *vec, int i) {
+  return (Token *) vec_get(vec, i);
+}
+
 int expect(int line, int expected, int actual) {
   if (expected == actual)
     return;
@@ -195,16 +250,30 @@ int expect(int line, int expected, int actual) {
 }
 
 void runtest() {
+/*  Vector *vec = new_vector();*/
+/*  expect(__LINE__, 0, vec->len);*/
+
+/*  for (int i = 0; i < 100; i++)*/
+/*    vec_push(vec, (void *)i);*/
+
+/*  expect(__LINE__, 100, vec->len);*/
+/*  expect(__LINE__, 0, (int)vec->data[0]);*/
+/*  expect(__LINE__, 50, (int)vec->data[50]);*/
+/*  expect(__LINE__, 99, (int)vec->data[99]);*/
+
+/*  printf("OK\n");*/
   Vector *vec = new_vector();
-  expect(__LINE__, 0, vec->len);
-
-  for (int i = 0; i < 100; i++)
-    vec_push(vec, (void *)i);
-
+  for (int i = 0; i < 100; i++) {
+    Token *t = malloc(sizeof(Token));
+    t->ty = TK_NUM;
+    t->val = i;
+    vec_push(vec, (void *)t);
+  }
   expect(__LINE__, 100, vec->len);
-  expect(__LINE__, 0, (int)vec->data[0]);
-  expect(__LINE__, 50, (int)vec->data[50]);
-  expect(__LINE__, 99, (int)vec->data[99]);
+  expect(__LINE__, 0, vec_get_token(vec, 0)->val);
+  expect(__LINE__, 50, vec_get_token(vec, 50)->val);
+  expect(__LINE__, 99, vec_get_token(vec, 99)->val);
+  expect(__LINE__, TK_NUM, vec_get_token(vec, 99)->ty);
 
   printf("OK\n");
 }
@@ -220,7 +289,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  tokenize(argv[1]);
+/*  tokenize(argv[1]);*/
+  tokenize2(argv[1]);
   Node *node = add();
 
   printf(".intel_syntax noprefix\n");
